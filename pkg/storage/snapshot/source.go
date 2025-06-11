@@ -38,6 +38,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	kubevirtv1 "kubevirt.io/api/core/v1"
+	virtv1 "kubevirt.io/api/core/v1"
 	snapshotv1 "kubevirt.io/api/snapshot/v1beta1"
 	"kubevirt.io/client-go/log"
 	cdiv1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -79,6 +80,7 @@ type snapshotSource interface {
 
 type sourceState struct {
 	online     bool
+	running    bool
 	guestAgent bool
 	frozen     bool
 	locked     bool
@@ -100,6 +102,8 @@ func (s *vmSnapshotSource) UpdateSourceState() error {
 
 	online := exists
 
+	running := exists && s.vm.Status.PrintableStatus == virtv1.VirtualMachineStatusRunning
+
 	condManager := controller.NewVirtualMachineInstanceConditionManager()
 	guestAgent := exists && condManager.HasCondition(vmi, kubevirtv1.VirtualMachineInstanceAgentConnected)
 
@@ -114,6 +118,7 @@ func (s *vmSnapshotSource) UpdateSourceState() error {
 
 	s.state = &sourceState{
 		online:     online,
+		running:    running,
 		guestAgent: guestAgent,
 		locked:     locked,
 		frozen:     frozen,
@@ -411,6 +416,10 @@ func (s *vmSnapshotSource) Online() bool {
 	return s.state.online
 }
 
+func (s *vmSnapshotSource) Running() bool {
+	return s.state.running
+}
+
 func (s *vmSnapshotSource) GuestAgent() bool {
 	return s.state.guestAgent
 }
@@ -428,7 +437,10 @@ func (s *vmSnapshotSource) Freeze() error {
 	}
 
 	if !s.GuestAgent() {
-		if s.Online() {
+		if err := s.UpdateSourceState(); err != nil {
+			return err
+		}
+		if s.Running() {
 			log.Log.Warningf("Guest agent does not exist and VM %s is running. Snapshoting without freezing FS. This can result in inconsistent snapshot!", s.vm.Name)
 		}
 		return nil

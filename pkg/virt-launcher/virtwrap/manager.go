@@ -1503,6 +1503,30 @@ func (l *LibvirtDomainManager) getDomainSpec(dom cli.VirDomain) (*api.DomainSpec
 	return domainSpec, err
 }
 
+//func (l *LibvirtDomainManager) lookupDomainAndState(domainName string, vmi *v1.VirtualMachineInstance) (cli.VirDomain, libvirt.DomainState, error) {
+//	dom, err := l.virConn.LookupDomainByName(domainName)
+//	if err != nil {
+//		if domainerrors.IsNotFound(err) {
+//			return nil, libvirt.DOMAIN_NOSTATE, nil
+//		}
+//		log.Log.Object(vmi).Reason(err).Error(failedGetDomain)
+//		return nil, libvirt.DOMAIN_NOSTATE, err
+//	}
+//
+//	domState, _, err := dom.GetState()
+//	if err != nil {
+//		if domainerrors.IsNotFound(err) {
+//			dom.Free()
+//			return nil, libvirt.DOMAIN_NOSTATE, nil
+//		}
+//		log.Log.Object(vmi).Reason(err).Error(failedGetDomainState)
+//		dom.Free()
+//		return nil, libvirt.DOMAIN_NOSTATE, err
+//	}
+//
+//	return dom, domState, nil
+//}
+
 func removePreviousMemoryDump(dir string) {
 	files, err := os.ReadDir(dir)
 	if err != nil {
@@ -1736,6 +1760,28 @@ func (l *LibvirtDomainManager) FreezeVMI(vmi *v1.VirtualMachineInstance, unfreez
 	domainName := api.VMINamespaceKeyFunc(vmi)
 	safetyUnfreezeTimeout := time.Duration(unfreezeTimeoutSeconds) * time.Second
 
+	dom, err := l.virConn.LookupDomainByName(domainName)
+	if err != nil {
+		if domainerrors.IsNotFound(err) {
+			return fmt.Errorf("Domain not found.")
+		} else {
+			return err
+		}
+	}
+	defer dom.Free()
+
+	domState, _, err := dom.GetState()
+	if err != nil {
+		log.Log.Object(vmi).Reason(err).Error(failedGetDomainState)
+		return err
+	}
+
+	// in case the domain is paused, should be considered as already frozen
+	if domState == libvirt.DOMAIN_PAUSED {
+		log.Log.Object(vmi).Info("Domain paused; Skipping freeze.")
+		return nil
+	}
+
 	fsfreezeStatus, err := l.getParsedFSStatus(domainName)
 	if err != nil {
 		log.Log.Errorf("Failed to get fs status before freeze vmi %s, %s", vmi.Name, err.Error())
@@ -1774,6 +1820,28 @@ func (l *LibvirtDomainManager) FreezeVMI(vmi *v1.VirtualMachineInstance, unfreez
 func (l *LibvirtDomainManager) UnfreezeVMI(vmi *v1.VirtualMachineInstance) error {
 	l.cancelSafetyUnfreeze()
 	domainName := api.VMINamespaceKeyFunc(vmi)
+
+	dom, err := l.virConn.LookupDomainByName(domainName)
+	if err != nil {
+		if domainerrors.IsNotFound(err) {
+			return fmt.Errorf("Domain not found.")
+		} else {
+			return err
+		}
+	}
+	defer dom.Free()
+
+	domState, _, err := dom.GetState()
+	if err != nil {
+		log.Log.Object(vmi).Reason(err).Error(failedGetDomainState)
+		return err
+	}
+
+	if domState == libvirt.DOMAIN_PAUSED {
+		log.Log.Object(vmi).Info("Domain paused; Skipping unfreeze.")
+		return nil
+	}
+
 	fsfreezeStatus, err := l.getParsedFSStatus(domainName)
 	if err == nil {
 		// prevent initating fs thaw to prevent rerunning the thaw hook
@@ -1781,6 +1849,7 @@ func (l *LibvirtDomainManager) UnfreezeVMI(vmi *v1.VirtualMachineInstance) error
 			return nil
 		}
 	}
+
 	// even if failed we should still try to unfreeze the fs
 	_, err = l.virConn.QemuAgentCommand(`{"execute":"guest-fsfreeze-thaw"}`, domainName)
 	if err != nil {

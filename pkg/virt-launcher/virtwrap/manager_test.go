@@ -639,6 +639,27 @@ var _ = Describe("Manager", func() {
 			// wait for the unfreeze timeout
 			time.Sleep(unfreezeTimeout + 2*time.Second)
 		})
+		FIt("should skip freeze a VirtualMachineInstance for a paused domain state", func() {
+			vmi := newVMI(testNamespace, testVmName)
+
+			mockConn.EXPECT().LookupDomainByName(testDomainName).DoAndReturn(mockDomainWithFreeExpectation)
+			mockDomain.EXPECT().GetState().Return(libvirt.DOMAIN_PAUSED, 1, nil)
+
+			manager, _ := NewLibvirtDomainManager(mockConn, testVirtShareDir, testEphemeralDiskDir, nil, "/usr/share/OVMF", ephemeralDiskCreatorMock, metadataCache, nil)
+
+			Expect(manager.FreezeVMI(vmi, 0)).To(Succeed())
+		})
+
+		FIt("should skip unfreeze a VirtualMachineInstance for a paused domain state", func() {
+			vmi := newVMI(testNamespace, testVmName)
+
+			mockConn.EXPECT().LookupDomainByName(testDomainName).DoAndReturn(mockDomainWithFreeExpectation)
+			mockDomain.EXPECT().GetState().Return(libvirt.DOMAIN_PAUSED, 1, nil)
+
+			manager, _ := NewLibvirtDomainManager(mockConn, testVirtShareDir, testEphemeralDiskDir, nil, "/usr/share/OVMF", ephemeralDiskCreatorMock, metadataCache, nil)
+
+			Expect(manager.UnfreezeVMI(vmi)).To(Succeed())
+		})
 		It("should update domain with memory dump info when completed successfully", func() {
 			mockConn.EXPECT().LookupDomainByName(testDomainName).DoAndReturn(mockDomainWithFreeExpectation)
 			mockDomain.EXPECT().CoreDumpWithFormat(testDumpPath, libvirt.DOMAIN_CORE_DUMP_FORMAT_RAW, libvirt.DUMP_MEMORY_ONLY).Return(nil)
