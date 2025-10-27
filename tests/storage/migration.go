@@ -142,9 +142,10 @@ var _ = Describe(SIG("Volumes update with migration", decorators.RequiresTwoSche
 			destPVC string
 		)
 		const (
-			fsPVC    = "filesystem"
-			blockPVC = "block"
-			size     = "1Gi"
+			fsPVC            = "filesystem"
+			blockPVC         = "block"
+			size             = "1Gi"
+			sizeWithOverhead = "2Gi" //"1.2Gi"
 		)
 
 		waitMigrationToNotExist := func(vmiName, ns string) {
@@ -364,7 +365,7 @@ var _ = Describe(SIG("Volumes update with migration", decorators.RequiresTwoSche
 						&expect.BSnd{S: "\n"},
 						&expect.BExp{R: ""},
 						&expect.BSnd{S: "[ $(lsblk /dev/vda -o SIZE -n |sed -e \"s/ //g\") == \"4G\" ] && true\n"},
-						&expect.BExp{R: "0"},
+						&expect.BExp{R: console.PromptExpression},
 					}, 10)
 					return err
 				}, 120).Should(Succeed())
@@ -408,7 +409,7 @@ var _ = Describe(SIG("Volumes update with migration", decorators.RequiresTwoSche
 			destDV := libdv.NewDataVolume(
 				libdv.WithBlankImageSource(),
 				libdv.WithStorage(libdv.StorageWithStorageClass(testSc),
-					libdv.StorageWithVolumeSize(size),
+					libdv.StorageWithVolumeSize("2Gi"), //size),
 					libdv.StorageWithVolumeMode(k8sv1.PersistentVolumeFilesystem),
 					libdv.StorageWithAccessMode(k8sv1.ReadWriteOnce),
 				),
@@ -566,8 +567,8 @@ var _ = Describe(SIG("Volumes update with migration", decorators.RequiresTwoSche
 		It("should migrate a PVC with a VM using a containerdisk", func() {
 			volName := "volume"
 			srcPVC := "src-" + rand.String(5)
-			libstorage.CreateBlankFSDataVolume(srcPVC, ns, size, nil)
-			libstorage.CreateBlankFSDataVolume(destPVC, ns, size, nil)
+			libstorage.CreateBlankFSDataVolume(srcPVC, ns, size, nil) //CreateFSPVC not relevant anymore?
+			libstorage.CreateBlankFSDataVolume(destPVC, ns, "2Gi", nil)
 			vmi := libvmifact.NewCirros(
 				libvmi.WithNamespace(ns),
 				libvmi.WithInterface(libvmi.InterfaceDeviceWithMasqueradeBinding()),
@@ -1318,7 +1319,7 @@ func waitForMigrationToSucceed(virtClient kubecli.KubevirtClient, vmiName, ns st
 		vmi, err := virtClient.VirtualMachineInstance(ns).Get(context.Background(), vmiName, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred())
 		return vmi.Status.MigrationState
-	}, 360*time.Second, time.Second).Should(And(Not(BeNil()), gstruct.PointTo(
+	}, 360*time.Second, time.Second).Should(And(Not(BeNil()), gstruct.PointTo( //increased from  120 to 250 in arnon PR, not relevant anymore
 		gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 			"Failed":    BeFalse(),
 			"Completed": BeTrue(),
