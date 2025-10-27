@@ -228,6 +228,8 @@ var _ = Describe(SIG("Memory dump", func() {
 		} else {
 			Expect(lsOutput).ToNot(Equal(previousOutput))
 		}
+		// cleanup the pod - temporary for gcnv tests
+		virtClient.CoreV1().Pods(executorPod.Namespace).Delete(context.Background(), executorPod.Name, metav1.DeleteOptions{})
 
 		return lsOutput
 	}
@@ -293,7 +295,6 @@ var _ = Describe(SIG("Memory dump", func() {
 
 			memoryDumpPVC = libstorage.CreateFSPVC(memoryDumpPVCName, testsuite.GetTestNamespace(vm), memoryDumpPVCSize, libstorage.WithStorageProfile())
 		})
-
 		It("[test_id:8499]Should be able to get and remove memory dump calling endpoint directly", func() {
 			previousOutput := createMemoryDumpAndVerify(vm, memoryDumpPVCName, noPreviousOutput, memoryDumpVMSubresource)
 			removeMemoryDumpAndVerify(vm, memoryDumpPVCName, previousOutput, removeMemoryDumpVMSubresource)
