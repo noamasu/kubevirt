@@ -1,6 +1,12 @@
 {
-    "storageClassRhel":        "rhel",
-    "storageClassWindows":     "windows",
-    "storageRWOFileSystem":    "local"
-}
+    "storageRWXFileSystem":    "sp-balanced-storage",
+    "storageRWOFileSystem":    "sp-balanced-storage",
+    "storageSnapshot":         "sp-balanced-storage-rwo",
+    "storageClassCSI":         "sp-balanced-storage-rwo",
+    "storageClassRhel":        "sp-balanced-storage",
+    "storageClassWindows":     "sp-balanced-storage",
+    "storageRWXBlock":         "sp-balanced-storage",
+    "storageRWOBlock":         "sp-balanced-storage",
+    "storageVMState":          "sp-balanced-storage"
 
+}

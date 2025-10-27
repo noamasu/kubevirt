@@ -180,7 +180,9 @@ func NewPVC(name, size, storageClass string, opts ...Option) *k8sv1.PersistentVo
 	}
 
 	for _, opt := range opts {
-		opt(pvc)
+		if opt != nil {
+			opt(pvc)
+		}
 	}
 
 	return pvc

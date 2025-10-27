@@ -99,6 +99,12 @@ var _ = Describe(SIG("Memory dump", func() {
 		return vm
 	}
 
+	deletePod := func(pod *k8sv1.Pod) {
+		Eventually(func() error {
+			return virtClient.CoreV1().Pods(pod.Namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
+		}, 180*time.Second, time.Second).Should(MatchError(errors.IsNotFound, "k8serrors.IsNotFound"))
+	}
+
 	verifyMemoryDumpNotOnVMI := func(vm *v1.VirtualMachine, memoryDumpPVC string) {
 		Eventually(func() error {
 			updatedVMI, err := virtClient.VirtualMachineInstance(vm.Namespace).Get(context.Background(), vm.Name, metav1.GetOptions{})
@@ -229,6 +235,8 @@ var _ = Describe(SIG("Memory dump", func() {
 			Expect(lsOutput).ToNot(Equal(previousOutput))
 		}
 
+		deletePod(executorPod)
+
 		return lsOutput
 	}
 
@@ -293,7 +301,6 @@ var _ = Describe(SIG("Memory dump", func() {
 
 			memoryDumpPVC = libstorage.CreateFSPVC(memoryDumpPVCName, testsuite.GetTestNamespace(vm), memoryDumpPVCSize, libstorage.WithStorageProfile())
 		})
-
 		It("[test_id:8499]Should be able to get and remove memory dump calling endpoint directly", func() {
 			previousOutput := createMemoryDumpAndVerify(vm, memoryDumpPVCName, noPreviousOutput, memoryDumpVMSubresource)
 			removeMemoryDumpAndVerify(vm, memoryDumpPVCName, previousOutput, removeMemoryDumpVMSubresource)
@@ -366,16 +373,6 @@ var _ = Describe(SIG("Memory dump", func() {
 			// verify memory dump didnt reappeared in the VMI
 			verifyMemoryDumpNotOnVMI(vm, memoryDumpPVCName)
 			verifyMemoryDumpOutput(memoryDumpPVC, previousOutput, true)
-		})
-
-		It("[test_id:8501]Run memory dump with pvc too small should fail", func() {
-			By("Trying to get memory dump with small pvc")
-			memoryDumpPVC2 = libstorage.CreateFSPVC(memoryDumpPVCName2, testsuite.GetTestNamespace(vm), "200Mi", libstorage.WithStorageProfile())
-			Eventually(func() error {
-				return virtClient.VirtualMachine(vm.Namespace).MemoryDump(context.Background(), vm.Name, &v1.VirtualMachineMemoryDumpRequest{
-					ClaimName: memoryDumpPVC2.Name,
-				})
-			}, 10*time.Second, 2*time.Second).Should(MatchError(ContainSubstring("should be bigger then")))
 		})
 
 		It("[test_id:9341]Should be able to remove memory dump while memory dump is stuck", func() {

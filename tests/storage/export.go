@@ -37,6 +37,7 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	"sigs.k8s.io/yaml"
 
+	corev1 "k8s.io/api/core/v1"
 	k8sv1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -540,8 +541,12 @@ var _ = Describe(SIG("Export", func() {
 			Spec: k8sv1.PersistentVolumeClaimSpec{
 				AccessModes:      pvc.Spec.AccessModes,
 				StorageClassName: pvc.Spec.StorageClassName,
-				Resources:        pvc.Spec.Resources,
-				VolumeMode:       pvc.Spec.VolumeMode,
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("2Gi"),
+					},
+				},
+				VolumeMode: pvc.Spec.VolumeMode,
 			},
 		}
 		By("Creating target PVC, so we can inspect if the export worked")
