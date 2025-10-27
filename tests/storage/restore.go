@@ -1171,7 +1171,7 @@ var _ = Describe(SIG("VirtualMachineRestore Tests", func() {
 				restore = waitRestoreComplete(restore, vm.Name, &vm.UID)
 				Expect(restore.Status.Restores).To(HaveLen(1))
 			})
-
+			// F - passed
 			It("restore should stop target if targetReadinessPolicy is StopTarget", func() {
 				vm, vmi = createAndStartVM(renderVMWithRegistryImportDataVolume(cd.ContainerDiskCirros, snapshotStorageClass))
 
@@ -1894,7 +1894,7 @@ var _ = Describe(SIG("VirtualMachineRestore Tests", func() {
 
 			It("should restore with volume restore policy InPlace and PVC as disk", func() {
 				pvcName := "standalone-pvc"
-				pvc := libstorage.NewPVC(pvcName, "2Gi", snapshotStorageClass, libstorage.WithStorageProfile())
+				pvc := libstorage.NewPVC(pvcName, "2Gi", snapshotStorageClass)
 				pvc, err := virtClient.CoreV1().PersistentVolumeClaims(testsuite.GetTestNamespace(nil)).Create(context.Background(), pvc, metav1.CreateOptions{})
 				Expect(err).ToNot(HaveOccurred())
 
@@ -2173,7 +2173,7 @@ var _ = Describe(SIG("VirtualMachineRestore Tests", func() {
 					// TODO: consider ensuring network clone gets done here using StorageProfile CloneStrategy
 					dataVolume := libdv.NewDataVolume(
 						libdv.WithPVCSource(sourceDV.Namespace, sourceDV.Name),
-						libdv.WithStorage(libdv.StorageWithStorageClass(forcedHostAssistedScName), libdv.StorageWithoutVolumeSize()),
+						libdv.WithStorage(libdv.StorageWithStorageClass(forcedHostAssistedScName), libdv.StorageWithVolumeSize("2Gi")),
 					)
 
 					return libvmi.NewVirtualMachine(
